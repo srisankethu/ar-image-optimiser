@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image Optimiser</title>
+    <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css'>
+    <style>
+    .pointer {cursor: pointer;}
+    </style>
+    <script src="https://unpkg.com/arweave/bundles/web.bundle.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.2.1/js/bootstrap.min.js"></script>
+    <script src="imageoptimiser.js"></script>
+    <script>
+    var logged = false;
+    var user_address = '';
+    var key = '';
+    var logout;
+
+    function onBodyload(){
+      logout = document.getElementById('logout').cloneNode(true);
+
+      if(	document.getElementById("logout")!=null){
+        document.getElementById("logout").remove();
+      }
+
+      document.body.append(createLoginForm());
+    }
+
+    function logoff(){
+      if(	document.getElementById("image-form")!=null){
+        document.getElementById("image-form").remove();
+      }
+      document.body.append(createLoginForm());
+      if(	document.getElementById("logout")!=null){
+        document.getElementById("logout").remove();
+      }
+      if(	document.getElementById("op-image")!=null){
+        document.getElementById("op-image").remove();
+      }
+      logged = false;
+      user_address = '';
+      key = '';
+    }
+
+    function refresh(){
+      if(document.getElementById('logout')!=null){
+        if(	document.getElementById("op-image")!=null){
+          document.getElementById("op-image").remove();
+        }
+        if(	document.getElementById("image-form")!=null){
+          document.getElementById("image-form").remove();
+        }
+        document.body.append(createImageForm());
+        var myNode = document.getElementById("images-list");
+        while (myNode.firstChild) {
+            myNode.removeChild(myNode.firstChild);
+        }
+        getTransactionsByAddress(user_address);
+      }
+      else{
+        if(	document.getElementById("login-form")!=null){
+          document.getElementById("login-form").remove();
+        }
+        document.body.append(createLoginForm());
+      }
+    }
+
+    function getKey(){
+        var filename = document.getElementById("key");
+        if(filename != null){
+            var reader = new FileReader();
+            reader.readAsText(filename.files[0]);
+            reader.onload = function () {
+              document.getElementById("jwk").value = reader.result;
+           };
+       }
+    }
+
+    function getImage(){
+      var filename = document.getElementById("op-image");
+      if(filename != null){
+        var reader = new FileReader();
+        reader.readAsDataURL(filename.files[0]);
+        reader.onload = function (){
+          document.getElementById("op-img").src = reader.result;
+        }
+      }
+    }
+
+    function validateLogin(){
+      if(document.getElementById("jwk") != null){
+        var jwk = JSON.parse(document.getElementById("jwk").value);
+        arweave.wallets.jwkToAddress(jwk).then((address) => {
+            logged = true;
+  			  	user_address = address;
+  				  key = jwk;
+            if(	document.getElementById("login-form")!=null){
+              document.getElementById("login-form").remove();
+            }
+            document.body.append(createImageForm());
+            var myNode = document.getElementById("images-list");
+            while (myNode.firstChild) {
+                myNode.removeChild(myNode.firstChild);
+            }
+            getTransactionsByAddress(address);
+            document.getElementsByClassName("nav-item")[0].append(logout);
+        }).catch((error) => {
+  			  console.log(error);
+  		  });
+      }
+    }
+
+    function addLinks(value, index, array){
+        var node = document.createElement("LI");
+        var textnode = document.createElement("a");
+        textnode.text = value;
+        textnode.href = "https://arweave.net/".concat(value);
+        textnode.target = "_blank";
+        node.appendChild(textnode);
+        document.getElementById("images-list").appendChild(node);
+    }
+
+    function createImageForm(){
+      var conf_form = document.createElement("SPAN");
+      conf_form.id = "image-form";
+      conf_form.innerHTML = '<div class = "ml-1"> \
+      <div class = "form-group"> \
+      <label for="key"> <strong>Quality</strong> </label> \
+      <input type"range" id="quality" min="0" max="100" value="75"></input> \
+      </div> \
+      <div class = "form-group"> \
+      <label for="key"> <strong>Image Format</strong> </label> \
+      <select id = "format" name="format"> \
+        <option value="image/png">PNG</option> \
+        <option value="image/jpeg">JPEG</option> \
+        <option value="image/webp">WebP</option> \
+      </select> \
+      </div> \
+      <div class="form-group"> \
+      <label for="key"> <strong>maxWidth</strong> </label> \
+      <input id = "maxWidth" type="number" value = "1000"></input> \
+      </div> \
+      <div class="form-group"> \
+          <div class = "text-center"> \
+              <img src="" width = "800" height = "250" id = "op-img" alt=""> \
+          </div> \
+          <label for="key"> <strong>Add Image</strong> </label> \
+          <input id="op-image" type = "file", name = "op-image" accept="image/*" class = "form-control col-lg-2" onchange="getImage()"> \
+      </div> \
+      <button class = "btn-primary " type="button" onclick="uploadImage()"> Upload</button> \
+      </div> \
+      <h2 class = "text-center"> Previous Uploads</h2> \
+      <ul id = "images-list"></ul>'
+
+      return conf_form
+    }
+
+    function createLoginForm(){
+      var div_a = document.createElement("SPAN");
+      div_a.id = "login-form";
+      div_a.innerHTML = '<div class = "card col-md-5 mx-auto"> \
+        <div class = "text-center mx-auto"> \
+            <div class="form-group"> \
+                <label for="key"> <strong>Key File</strong> </label> \
+                <input id="key" type = "file", name = "key" accept=".json" class = "form-control col-lg-15" onchange="getKey()"> \
+            </div> \
+            <div class="form-group"> \
+                <input id="jwk" class="form-control" type = "hidden" name="jwk" value = ""> \
+            </div> \
+            <button class = "btn-primary" type="button" onclick="validateLogin()"> Submit</button> \
+        </div> \
+      </div>'
+      return div_a;
+    }
+
+    function dataURItoUInt8(dataURI) {
+    // convert base64 to raw binary data held in a string
+    var byteString = atob(dataURI.split(',')[1]);
+
+    // separate out the mime component
+    var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+    // write the bytes of the string to an ArrayBuffer
+    var arrayBuffer = new ArrayBuffer(byteString.length);
+    var ia = new Uint8Array(arrayBuffer);
+    for (var i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+
+    var dataView = new DataView(arrayBuffer);
+    var blob = new Blob([dataView], { type: mimeString });
+    return ia;
+    }
+
+
+    function uploadImage(){
+      var quality = document.getElementById("quality").value
+      if(quality)
+      {
+        quality = parseInt(quality);
+      }
+      else{
+        quality = 75
+      }
+      var e = document.getElementById("format");
+      var img_format = e.options[e.selectedIndex].value;
+      var maxWidth = document.getElementById("maxWidth").value
+      if(maxWidth)
+      {
+        maxWidth = parseInt(maxWidth);
+      }
+      else{
+        maxWidth = 1000;
+      }
+      comp_image = compress(document.getElementById("op-img"), quality, img_format, maxWidth);
+      arweave.createTransaction({data: dataURItoUInt8(comp_image.src)}, key).then((transaction) =>{
+        transaction.addTag('Content-Type', img_format)
+        transaction.addTag('app', 'ar-image-optimiser');
+        transaction.addTag('type', 'op-image');
+  			arweave.transactions.sign(transaction, key).then((signedtransaction) => {
+  				arweave.transactions.post(transaction).then((response) => {
+            console.log(transaction);
+  					refresh();
+  				}).catch((error) => {
+  					console.log(error);
+  				});
+  			}).catch((error) => {
+  				console.log(error);
+  			});
+  		}).catch((error) => {
+  			console.log(error);
+  		});
+    }
+
+    async function getTransactionsByAddress(address) {
+    	const query = {
+    		op: 'equals',
+    		expr1: 'from',
+    		expr2: address
+    	};
+    	const res = await arweave.api.post('arql', query);
+
+    	if(res.data && res.data.length) {
+    		await Promise.all(res.data.map(async linkId => {
+          arweave.transactions.get(linkId).then(transaction => {
+              var check = 0;
+              transaction.get('tags').forEach(tag => {
+                  let key = tag.get('name', {decode: true, string: true});
+                  let value = tag.get('value', {decode: true, string: true});
+                  if((key == 'app' && value == 'ar-image-optimiser') || (key == 'type' && value == 'op-image') || (key == 'Content-Type' && value.includes('image/'))){check++};
+                  if(check == 3){
+                    [linkId].forEach(addLinks);
+                  };
+              });
+          });
+    		}));
+    	}
+    }
+
+    const arweave = Arweave.init({
+        host: 'arweave.net',
+        port: 443,
+        protocol: 'https'
+    });
+    </script>
+</head>
+<body onload="onBodyload()">
+  <nav class="navbar navbar-expand-sm bg-light">
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <p class="navbar-brand pointer" onclick="refresh()"> Dashboard</p>
+      </div>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <button id = "logout" class="btn btn-secondary bg-primary" onclick="logoff()"> Log Out</button>
+        </li>
+      </ul>
+    </div>
+  </nav>
+</body>
+</html>
